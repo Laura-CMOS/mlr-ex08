@@ -50,12 +50,16 @@ follows the model rather than a hardcoded copy of its settings.
 ## Checks already made
 
 * The **Run the check** button runs `check_image.jpg` through the page and compares it
-  with `check_expected.json`. In a desktop browser the largest difference is
-  **0.000000** — the page reproduces the notebook to three decimals. (A 96 × 96 source is
-  copied without resampling, so the pixels are identical to the ones the notebook saw.)
-* The page makes **9 requests, all downloads**: 6 from this repository, 3 from the
-  jsDelivr CDN (the library, its WebAssembly glue and the ~15 MB engine, cached after the
-  first visit). No photograph is sent anywhere — there is no upload call in `index.html`.
+  with `check_expected.json`. Loaded from the published address in a desktop browser, the
+  largest difference is **0.000000** — the page reproduces the notebook to three decimals.
+  (A 96 × 96 source is copied without resampling, so the pixels are identical to the ones
+  the notebook saw.)
+* The page asks for **10 resources, every one a download**: 6 from this repository
+  (the page, the model, `model_info.json`, `qrcode.js`, and the two check files once the
+  check has been run), 3 from the jsDelivr CDN (the library, its WebAssembly glue and the ~15 MB
+  engine, cached after the first visit), plus the tab icon the browser requests itself.
+  No photograph is sent anywhere — there is no upload call in `index.html`, and the browser
+  console stays empty (0 messages, 0 exceptions).
 * `ort.env.wasm.numThreads = 1` because GitHub Pages sends no cross-origin isolation
   headers, so `SharedArrayBuffer` is unavailable and a threaded engine would never start.
 

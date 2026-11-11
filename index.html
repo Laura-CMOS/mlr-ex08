@@ -88,9 +88,9 @@ exported weights &mdash; the picture is never uploaded anywhere.</p>
   <p class="sub">The frame is read into a canvas on the phone and turned into numbers
   there. Those numbers go to the WebAssembly engine, which lives in the same tab.
   <strong>No photograph is sent anywhere</strong> &mdash; there is no upload call in this
-  file: the browser's network tab shows only the files listed above, every one of them a
-  <em>download</em>. (Checked in a desktop browser: 9 responses, none of them a request
-  with picture data.)</p>
+  file: the browser's network tab shows only the files listed above (plus the tab icon the
+  browser asks for itself), every one of them a <em>download</em>. Checked in a desktop
+  browser: 10 responses, none of them a request carrying picture data.</p>
 </section>
 
 <!-- classic script: it defines the global function qrcode() that the module below uses -->
