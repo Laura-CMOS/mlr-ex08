@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Leaf classifier — MLR Exercise 8</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 640px; margin: 0 auto;
+         padding: 16px; color: #1c1c1c; background: #fafaf8; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.2rem; }
+  .sub { color: #555; font-size: 0.9rem; margin-top: 0.2rem; }
+  button, .file { font: inherit; padding: 10px 14px; margin: 4px 6px 4px 0;
+                  border-radius: 8px; border: 1px solid #bbb; background: #fff; cursor: pointer; }
+  video { width: 100%; border-radius: 10px; background: #000; }
+  /* the square the model actually gets, shown as it is fed: 96 x 96, no smoothing */
+  #seen { width: 96px; height: 96px; image-rendering: pixelated;
+          border: 1px solid #ccc; border-radius: 4px; vertical-align: top; }
+  .row { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+  .name { width: 84px; font-weight: 600; }
+  .bar  { flex: 1; height: 18px; background: #e6e4de; border-radius: 9px; overflow: hidden; }
+  .fill { height: 100%; background: #2e7d32; transition: width 0.15s; }
+  .pct  { width: 62px; text-align: right; font-variant-numeric: tabular-nums; }
+  .meta { color: #666; font-size: 0.85rem; }
+  table { border-collapse: collapse; font-size: 0.9rem; margin-top: 6px; }
+  td, th { padding: 3px 10px 3px 0; text-align: left; font-variant-numeric: tabular-nums; }
+  .ok { color: #2e7d32; font-weight: 600; }
+  .bad { color: #c00000; font-weight: 600; }
+  section { margin-top: 22px; border-top: 1px solid #e2e0da; padding-top: 10px; }
+  #qr svg { width: 168px; height: 168px; display: block; }
+  code { background: #eeece7; padding: 1px 4px; border-radius: 4px; }
+  a { color: #1a56b8; word-break: break-all; }
+</style>
+</head>
+<body>
+
+<h1>Leaf classifier</h1>
+<p class="sub">MobileNetV3-small exported to ONNX in <code>ex08_student.ipynb</code>
+(Task&nbsp;2). Training runs on a laptop; here the browser only <em>runs</em> the
+exported weights &mdash; the picture is never uploaded anywhere.</p>
+
+<div>
+  <button id="start">Start the camera</button>
+  <button id="stop" hidden>Stop</button>
+  <label class="file">or upload a photo
+    <input type="file" id="file" accept="image/*" hidden>
+  </label>
+</div>
+
+<video id="video" playsinline muted autoplay hidden></video>
+<div class="meta" id="status">Loading the model &hellip;</div>
+<div>
+  <canvas id="seen" width="96" height="96" title="exactly what the network is shown"></canvas>
+  <span class="meta">&larr; the central square of the frame, resized to
+    <span id="sizeLabel">96</span>&times;<span id="sizeLabel2">96</span> &mdash; what the network sees.</span>
+</div>
+
+<div id="results"></div>
+<p class="meta" id="timing"></p>
+
+<section>
+  <h2>Check against the notebook</h2>
+  <p class="sub">Runs <code>check_image.jpg</code> through this page and compares the
+  probabilities with the ones the notebook wrote into <code>check_expected.json</code>.</p>
+  <button id="check">Run the check</button>
+  <div id="checkOut"></div>
+</section>
+
+<section>
+  <h2>Open this page on a phone</h2>
+  <div id="qr"></div>
+  <p><a id="qrLink" href="#"></a></p>
+  <p class="meta">The QR code is drawn by <code>qrcode.js</code> in this folder &mdash;
+  it is made in your browser, no QR web service is asked for anything. It encodes the
+  address printed above it, and nothing else.</p>
+</section>
+
+<section>
+  <h2>What this page loads, and where your photo goes</h2>
+  <ul class="sub">
+    <li><code>leaf_model.onnx</code> and <code>model_info.json</code> &mdash; from this
+        same GitHub Pages address, your own repository.</li>
+    <li><code>onnxruntime-web</code> &mdash; the JavaScript library that runs ONNX files,
+        from the jsDelivr CDN. It also fetches its WebAssembly engine
+        (<code>ort-wasm-simd-threaded.wasm</code>, about 15&nbsp;MB, cached after the
+        first visit) from there.</li>
+    <li><code>qrcode.js</code> &mdash; a local file of this repository, for the QR code above.</li>
+  </ul>
+  <p class="sub">The frame is read into a canvas on the phone and turned into numbers
+  there. Those numbers go to the WebAssembly engine, which lives in the same tab.
+  <strong>No photograph is sent anywhere</strong> &mdash; there is no upload call in this
+  file: the browser's network tab shows only the files listed above, every one of them a
+  <em>download</em>. (Checked in a desktop browser: 9 responses, none of them a request
+  with picture data.)</p>
+</section>
+
+<!-- classic script: it defines the global function qrcode() that the module below uses -->
+<script src="qrcode.js"></script>
+<script type="module">
+// The address this page is published at. The QR code and the text link both take it
+// from this one constant, so the two can never disagree.
+const PAGE_URL = "https://Laura-CMOS.github.io/mlr-ex08/";
+
+// The wasm-only build (ort.wasm.min.mjs): 15 MB of WebAssembly instead of the 30 MB
+// of the default build, which also carries the WebGPU and WebGL backends we do not use.
+const ort = await import("https://cdn.jsdelivr.net/npm/onnxruntime-web@1.31.1/dist/ort.wasm.min.mjs");
+ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.31.1/dist/";
+// GitHub Pages sends no Cross-Origin-Opener/Embedder-Policy headers, so SharedArrayBuffer
+// is not available here and a multi-threaded engine would wait forever for its workers.
+ort.env.wasm.numThreads = 1;
+
+const status = document.getElementById("status");
+const video = document.getElementById("video");
+const seen = document.getElementById("seen");
+const results = document.getElementById("results");
+const timing = document.getElementById("timing");
+
+// The preprocessing is read from the model file itself, not hardcoded: the notebook
+// wrote classes, input size and the mean/std of the normalisation into model_info.json.
+const info = await (await fetch("model_info.json")).json();
+const SIZE = info.input_size;
+const ctx = seen.getContext("2d", { willReadFrequently: true });
+
+status.textContent = "Loading leaf_model.onnx (6.3 MB) and the WebAssembly engine (15 MB, cached next time) …";
+const modelBytes = new Uint8Array(await (await fetch("leaf_model.onnx")).arrayBuffer());
+const session = await ort.InferenceSession.create(modelBytes, { executionProviders: ["wasm"] });
+status.textContent = `Model ready: input ${session.inputNames[0]} [1, 3, ${SIZE}, ${SIZE}], `
+                   + `output ${session.outputNames[0]}, ${info.classes.length} classes.`;
+document.getElementById("sizeLabel").textContent = SIZE;
+document.getElementById("sizeLabel2").textContent = SIZE;
+
+// The whole preprocessing, the two transforms of the notebook in the same order:
+//   ToTensor():   central square, resized to SIZE x SIZE, RGB pixels divided by 255,
+//                 channels first: (H, W, 3) -> (3, H, W)
+//   Normalize():  every channel (value - mean) / std
+function preprocess(source, sourceWidth, sourceHeight) {
+  const side = Math.min(sourceWidth, sourceHeight);       // the central square
+  const left = (sourceWidth - side) / 2;
+  const top = (sourceHeight - side) / 2;
+  // A source that already is SIZE x SIZE is copied 1:1, without resampling, so the
+  // check image gives exactly the pixels the notebook saw.
+  ctx.imageSmoothingEnabled = side !== SIZE;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(source, left, top, side, side, 0, 0, SIZE, SIZE);
+  const { data } = ctx.getImageData(0, 0, SIZE, SIZE);    // RGBA, 0..255, row after row
+  const input = new Float32Array(3 * SIZE * SIZE);        // one plane per channel
+  const plane = SIZE * SIZE;
+  for (let p = 0; p < plane; p++) {
+    for (let c = 0; c < 3; c++) {
+      input[c * plane + p] = (data[4 * p + c] / 255 - info.mean[c]) / info.std[c];
+    }
+  }
+  return input;
+}
+
+// The network ends in raw scores (logits): during training nn.CrossEntropyLoss applied
+// the softmax itself, so the page has to do it.
+function softmax(logits) {
+  const top = Math.max(...logits);
+  const exps = Array.from(logits, (v) => Math.exp(v - top));
+  const total = exps.reduce((a, b) => a + b, 0);
+  return exps.map((e) => e / total);
+}
+
+async function classify(source, sourceWidth, sourceHeight) {
+  const tensor = new ort.Tensor("float32", preprocess(source, sourceWidth, sourceHeight),
+                                [1, 3, SIZE, SIZE]);
+  const output = await session.run({ [session.inputNames[0]]: tensor });
+  return softmax(output[session.outputNames[0]].data);
+}
+
+function show(probabilities, milliseconds) {
+  results.innerHTML = info.classes
+    .map((name, i) => `
+      <div class="row">
+        <span class="name">${name}</span>
+        <span class="bar"><span class="fill" style="width:${(100 * probabilities[i]).toFixed(1)}%"></span></span>
+        <span class="pct">${(100 * probabilities[i]).toFixed(1)}%</span>
+      </div>`)
+    .join("");
+  if (milliseconds !== undefined) {
+    timing.textContent = `one inference: ${milliseconds.toFixed(0)} ms on ${navigator.userAgent.includes("iPhone") || navigator.userAgent.includes("iPad") ? "iPhone/iPad" : "this browser"}`;
+  }
+}
+
+// ---- the live camera -------------------------------------------------------
+let stream = null;
+let running = false;
+
+async function loop() {
+  if (!running) return;
+  if (video.videoWidth > 0) {
+    const start = performance.now();
+    try {
+      show(await classify(video, video.videoWidth, video.videoHeight),
+           performance.now() - start);
+    } catch (error) {
+      status.textContent = "Inference failed: " + error.message;
+      running = false;
+      return;
+    }
+  }
+  setTimeout(loop, 200);   // a few updates per second is enough and spares the battery
+}
+
+document.getElementById("start").onclick = async () => {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: "environment" } },   // the rear camera
+      audio: false,
+    });
+  } catch (error) {
+    status.textContent = "The camera stayed shut (" + error.name +
+      "). On iPhone it needs HTTPS and your permission, or use the photo upload.";
+    return;
+  }
+  video.srcObject = stream;
+  video.hidden = false;
+  await video.play();          // the playsinline attribute keeps it on the page in Safari
+  document.getElementById("start").hidden = true;
+  document.getElementById("stop").hidden = false;
+  running = true;
+  loop();
+};
+
+document.getElementById("stop").onclick = () => {
+  running = false;
+  if (stream) stream.getTracks().forEach((track) => track.stop());
+  stream = null;
+  video.hidden = true;
+  document.getElementById("start").hidden = false;
+  document.getElementById("stop").hidden = true;
+  status.textContent = "Camera stopped. The model is still loaded.";
+};
+
+// ---- the upload fallback ---------------------------------------------------
+document.getElementById("file").onchange = (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+  const image = new Image();
+  image.onload = async () => {
+    show(await classify(image, image.naturalWidth, image.naturalHeight));
+    timing.textContent = `${file.name}: ${image.naturalWidth} x ${image.naturalHeight} -> ${SIZE} x ${SIZE}`;
+    URL.revokeObjectURL(image.src);
+  };
+  image.src = URL.createObjectURL(file);
+};
+
+// ---- the check against the notebook ----------------------------------------
+document.getElementById("check").onclick = async () => {
+  const expected = await (await fetch("check_expected.json")).json();
+  const image = new Image();
+  image.onload = async () => {
+    const got = await classify(image, image.naturalWidth, image.naturalHeight);
+    const rows = info.classes.map((name, i) => {
+      const difference = Math.abs(got[i] - expected[name]);
+      return `<tr><td>${name}</td><td>${got[i].toFixed(6)}</td><td>${expected[name].toFixed(6)}</td>
+              <td class="${difference <= 0.001 ? "ok" : "bad"}">${difference.toFixed(6)}</td></tr>`;
+    }).join("");
+    const worst = Math.max(...info.classes.map((name, i) => Math.abs(got[i] - expected[name])));
+    document.getElementById("checkOut").innerHTML = `
+      <table>
+        <tr><th>class</th><th>this page</th><th>notebook</th><th>difference</th></tr>
+        ${rows}
+      </table>
+      <p class="${worst <= 0.001 ? "ok" : "bad"}">largest difference ${worst.toFixed(6)} &mdash;
+      ${worst <= 0.001 ? "the page agrees with the notebook to three decimals."
+                       : "the page does NOT agree to three decimals."}</p>`;
+    URL.revokeObjectURL(image.src);
+  };
+  image.src = "check_image.jpg";
+};
+
+// ---- the QR code, drawn here in the browser --------------------------------
+const qr = qrcode(0, "M");            // 0 = pick the smallest version that fits, M = error correction
+qr.addData(PAGE_URL);
+qr.make();
+document.getElementById("qr").innerHTML = qr.createSvgTag({ cellSize: 4, margin: 0, scalable: true });
+const link = document.getElementById("qrLink");
+link.href = PAGE_URL;
+link.textContent = PAGE_URL;
+</script>
+</body>
+</html>
