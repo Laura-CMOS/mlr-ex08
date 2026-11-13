@@ -6,7 +6,7 @@ REVIEW for EXERCISE 8
 
 The web app successfully runs the machine learning model directly in the mobile browser. Using WebAssembly, it correctly loads the model settings (like the 96×96 input size) and processes the live camera feed locally in real-time.
 
-
+![The page classifying a live leaf on my phone](review-phone-live.jpg)
 
 
 2. Exact Prediction Match:
@@ -28,7 +28,7 @@ The JavaScript code faithfully recreates the PyTorch data preparation pipeline. 
 A network check proves that no images are ever uploaded to a server. The application only downloads the model weights and necessary code files. Because there are no upload requests, all classification happens strictly on the user's device.
 
 
-![The page classifying a live leaf on my phone](review-phone-live.jpg)
+
 
 
 5. Real-World Limitations:
