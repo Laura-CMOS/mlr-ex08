@@ -13,7 +13,13 @@ The web app successfully runs the machine learning model directly in the mobile 
 
 When tested on a standard control image, the browser's predictions match the original PyTorch notebook exactly (up to six decimal places). However, because this test image is already the correct size, this check only validates the math, not the image resizing step.
 
+class	this page	notebook	difference
+apple	0.550849	0.550849	0.000000
+cherry	0.448859	0.448859	0.000000
+chestnut	0.000275	0.000275	0.000000
+maple	0.000017	0.000017	0.000000
 
+![Run the check on the phone](review-check-notebook.jpg)
 
 
 3. Preprocessing Consistency:
