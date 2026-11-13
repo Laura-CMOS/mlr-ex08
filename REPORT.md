@@ -24,7 +24,7 @@ Not everything I tried was successful. Rotating and cropping images without also
 
 4. What Goes on the Phone
 
-I am exporting this winning combined model to the web app. It is much more accurate now but still lightweight enough to run quickly on a mobile browser.
+The optimized model is exported as task4/leaf_model_best.onnx. It retains the original MobileNet architecture, 96 × 96 input size, and 6.3 MB footprint, ensuring identical mobile inference speeds. The live application intentionally continues to run the older Task 2 model to keep the review and screenshots completely accurate to the current build. Updating the app requires only a single file replacement, which would instantly increase real-world camera accuracy from 62% to 82%.
 
 
 
