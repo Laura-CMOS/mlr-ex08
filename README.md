@@ -17,7 +17,8 @@ updated live. There is also a photo-upload button as a fallback.
 The exported file holds the weights of the **last** (15th) epoch — the notebook's Task 2
 loop does not keep the best epoch. Validation accuracy in that epoch was **0.774**, the
 best of the run was 0.839 in epoch 13; "keeping the weights of the best epoch" is one of
-the improvements measured in Task 4.
+the improvements measured in Task 4 — the runs are in `task4/task4_results.csv`, the
+table and what I conclude from them are in `REPORT.md`.
 
 ## The preprocessing, which has to match the notebook
 
@@ -46,6 +47,7 @@ follows the model rather than a hardcoded copy of its settings.
 | `qrcode.js` | Kazuhiko Arase's QR generator (MIT), vendored so the QR is drawn locally |
 | `REVIEW.md` | my review of the page, written by me (Task 2f) |
 | `REPORT.md` | my report on the improvements, written by me (Task 4) |
+| `task4/` | the evidence behind `REPORT.md`: the 8 training runs as a CSV and the better model I did **not** put on this page — see [`task4/README.md`](task4/README.md) |
 
 ## Checks already made
 
