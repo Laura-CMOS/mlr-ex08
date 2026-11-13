@@ -28,6 +28,7 @@ The JavaScript code faithfully recreates the PyTorch data preparation pipeline. 
 A network check proves that no images are ever uploaded to a server. The application only downloads the model weights and necessary code files. Because there are no upload requests, all classification happens strictly on the user's device.
 
 
+![The page classifying a live leaf on my phone](review-phone-live.jpg)
 
 
 5. Real-World Limitations:
